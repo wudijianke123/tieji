@@ -23,14 +23,16 @@
     --bad:#ff6b6b;
     --good:#38e0c0;
     --r:18px;
+    --safe-t:env(safe-area-inset-top,0px);
     --safe-b:env(safe-area-inset-bottom,0px);
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
+  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text)}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
     font-size:16px;line-height:1.5;
-    padding-bottom:calc(72px + var(--safe-b));
+    min-height:100%;
+    padding-bottom:calc(76px + var(--safe-b));
     overscroll-behavior-y:none;
   }
   button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
@@ -39,7 +41,7 @@
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
-  #wrap{max-width:620px;margin:0 auto;padding:0 14px}
+  #wrap{max-width:620px;margin:0 auto;padding:calc(6px + var(--safe-t)) 14px 0}
 
   /* ---------- 顶栏 ---------- */
   .top{display:flex;align-items:center;justify-content:space-between;padding:18px 2px 12px}
@@ -122,7 +124,7 @@
   /* ---------- 底部导航 ---------- */
   nav{
     position:fixed;left:0;right:0;bottom:0;z-index:40;
-    background:rgba(14,20,27,.92);backdrop-filter:blur(14px);
+    background:var(--bg);
     border-top:1px solid var(--line);
     padding:8px 0 calc(8px + var(--safe-b));
   }
@@ -265,7 +267,12 @@
 
 /* ==================== 常量 ==================== */
 var STORE = 'tieji.v1';
-var DOW = ['周日','周一','周二','周三','周四','周五','周六'];
+var DOW = ['','周一','周二','周三','周四','周五','周六','周日'];
+
+function dowOf(dateStr){
+  var d = new Date(dateStr + 'T00:00:00').getDay();
+  return d === 0 ? 7 : d;
+}
 var PARTS = ['胸','背','腿','臀','肩','手臂','核心'];
 var PART_ICON = {胸:'◇',背:'▽',腿:'▲',臀:'◍',肩:'◠',手臂:'⌇',核心:'◎'};
 var TYPE_LABEL = {compound:'大重量', isolation:'孤立', core:'腹部'};
@@ -329,8 +336,7 @@ function seedState(){
     return ex[0].id;
   }
   var A = ['上斜推胸','蝴蝶夹胸','划船机','辅助引体向上','悬垂举腿'].map(idOf);
-  var B = ['倒蹬机','坐姿腿屈伸','俯身飞鸟','哑铃弯举','仰卧起坐'];
-  B = ['倒蹬机','坐姿腿屈伸','俯身飞鸟','哑铃弯举'].map(idOf).concat([idOf('仰卧卷腹')]);
+  var B = ['倒蹬机','臀推','罗马尼亚硬拉','坐姿腿屈伸','侧平举','哑铃弯举','绳索三头下压','仰卧卷腹'].map(idOf);
   return {
     version: 1,
     settings: { rest: {compound:150, isolation:75, core:60}, sound:true, vibrate:true },
@@ -575,7 +581,7 @@ function renderToday(){
       html += '<div class="exrow"><div class="exico">' + (se.type==='F'?'F':se.type) + '</div>'
            + '<div class="exmain"><b>' + d + ' · ' + completedSetsOf(se) + ' 组</b>'
            + '<span>' + fmtDate(se.date) + ' · 容量 ' + Math.round(volumeOf(se)) + ' kg</span></div>'
-           + '<div class="exlast">' + DOW[new Date(se.date+'T00:00:00').getDay()] + '</div></div>';
+           + '<div class="exlast">' + DOW[dowOf(se.date)] + '</div></div>';
     });
     html += '</div>';
   }
@@ -712,8 +718,8 @@ function renderStats(){
     + '<div class="stat"><b>' + week.length + '</b><span>训练次数</span></div>'
     + '<div class="stat"><b>' + sets + '</b><span>完成组数</span></div>'
     + '<div class="stat"><b>' + Math.round(vol) + '</b><span>总容量 kg</span></div>'
-    + '<div class="stat"><b>' + (week.length?'●':'○') + '</b><span>'
-    + (week.length>=4?'达标':(week.length>=2?'还差几练':'刚开始')) + '</span></div>'
+    + '<div class="stat"><b>' + week.length + '/4</b><span>'
+    + (week.length>=4?'已达标':(week.length>=1?'还差 ' + (4-week.length) + ' 练':'每周目标')) + '</span></div>'
     + '</div>';
 
   html += '<div class="h"><h2>部位组数（本周）</h2></div><div class="card">';
