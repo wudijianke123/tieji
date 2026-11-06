@@ -25,14 +25,16 @@
     --r:18px;
     --safe-t:env(safe-area-inset-top,0px);
     --safe-b:env(safe-area-inset-bottom,0px);
+    --navh:90px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--text)}
+  html{height:100%}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text)}
   body{
     font-family:-apple-system,BlinkMacSystemFont,"SF Pro SC","PingFang SC","Microsoft YaHei",system-ui,sans-serif;
     font-size:16px;line-height:1.5;
     min-height:100%;
-    padding-bottom:calc(76px + var(--safe-b));
+    padding-bottom:calc(var(--navh) + 12px);
     overscroll-behavior-y:none;
   }
   button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
@@ -41,7 +43,16 @@
   input[type=number]::-webkit-outer-spin-button,
   input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 
-  #wrap{max-width:620px;margin:0 auto;padding:calc(6px + var(--safe-t)) 14px 0}
+  #wrap{
+    max-width:620px;margin:0 auto;
+    padding:calc(6px + var(--safe-t)) 14px 0;
+    min-height:calc(100vh - var(--navh) - 12px);
+    min-height:calc(100dvh - var(--navh) - 12px);
+    display:flex;flex-direction:column;
+  }
+  /* 内容区吃掉剩余高度：短页面（记录/教练）也能填满一屏，不再出现"沉不到底" */
+  #view{flex:1 0 auto;display:flex;flex-direction:column}
+  #view > *{flex:none}
 
   /* ---------- 顶栏 ---------- */
   .top{display:flex;align-items:center;justify-content:space-between;padding:18px 2px 12px}
@@ -592,7 +603,8 @@ function renderToday(){
 function renderLog(){
   var a = S.active;
   if (!a){
-    return '<div class="card" style="text-align:center;padding:34px 18px">'
+    return '<div class="card" style="text-align:center;padding:34px 18px;flex:1;'
+      + 'display:flex;flex-direction:column;align-items:center;justify-content:center">'
       + '<div style="font-size:34px;margin-bottom:10px">🏋️</div>'
       + '<b style="font-size:17px">还没有进行中的训练</b>'
       + '<p class="muted" style="margin:8px 0 18px">去「今日」开始，或直接开一个自由训练</p>'
@@ -608,6 +620,11 @@ function renderLog(){
     + '<b>' + (a.type==='F'?'自由训练':a.type+' 日训练') + '</b>'
     + '<span class="tiny">' + done + '/' + total + ' 组</span></div>'
     + '<div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+
+  html += '<div class="card tight" style="padding:10px 14px">'
+    + '<div style="display:flex;justify-content:space-between;align-items:center">'
+    + '<span class="tiny">共 ' + a.entries.length + ' 个动作</span>'
+    + '<span class="act" data-act="addExActive">+ 加动作</span></div></div>';
 
   a.entries.forEach(function(e, ei){
     var ex = exById(e.exId);
@@ -1013,6 +1030,21 @@ function sheetAddEx(type){
   openSheet(html);
 }
 
+function sheetAddActive(){
+  var html = '<h3>加动作</h3><div class="tiny" style="margin-bottom:8px">点一下加入这次训练</div>';
+  PARTS.forEach(function(p){
+    var list = S.exercises.filter(function(x){ return x.part===p; });
+    if (!list.length) return;
+    html += '<div class="tiny" style="margin:14px 0 2px;color:var(--acc)">' + p + '</div>';
+    list.forEach(function(ex){
+      html += '<div class="item"><div class="name"><b>' + esc(ex.name) + '</b>'
+        + '<span>' + TYPE_LABEL[ex.type] + '</span></div>'
+        + '<button class="add" data-act="pickActive" data-id="' + ex.id + '">+</button></div>';
+    });
+  });
+  openSheet(html);
+}
+
 function sheetNewEx(){
   var html = '<h3>自建动作</h3>'
     + '<div class="field"><label>名称</label><input id="newExName" placeholder="例如：坐姿推肩" style="min-width:170px"></div>'
@@ -1153,6 +1185,25 @@ document.addEventListener('click', function(ev){
       render();
       break;
     }
+    case 'addExActive': sheetAddActive(); break;
+    case 'pickActive': {
+      a = S.active; if (!a) break;
+      var pid = el.getAttribute('data-id');
+      var dup = false;
+      a.entries.forEach(function(x){ if (x.exId===pid) dup = true; });
+      if (dup){ toast('这次训练里已经有了'); break; }
+      var pex = exById(pid); if (!pex) break;
+      var pl = lastEntry(pid);
+      var pn = pex.type==='compound' ? 4 : 3;
+      var psets = [];
+      for (var pi=0; pi<pn; pi++){
+        var pp = pl && pl.sets[pi] ? pl.sets[pi] : null;
+        psets.push({w: pp?pp.w:0, r: pp?pp.r:0, done:false});
+      }
+      a.entries.push({exId: pid, sets: psets});
+      save(); closeSheet(); render(); toast('已加入 ' + pex.name);
+      break;
+    }
     case 'newEx': sheetNewEx(); break;
     case 'saveNewEx': {
       var nm = (document.getElementById('newExName').value||'').trim();
@@ -1278,9 +1329,20 @@ document.getElementById('restAdd').addEventListener('click', function(){
 document.addEventListener('dblclick', function(ev){ ev.preventDefault(); }, {passive:false});
 
 /* ==================== 启动 ==================== */
+function syncNavHeight(){
+  var n = document.querySelector('nav');
+  if (!n) return;
+  var h = Math.ceil(n.getBoundingClientRect().height);
+  if (h > 0) document.documentElement.style.setProperty('--navh', h + 'px');
+}
+
 S = load();
 save();
 render();
+syncNavHeight();
+window.addEventListener('resize', syncNavHeight);
+window.addEventListener('orientationchange', function(){ setTimeout(syncNavHeight, 250); });
+window.addEventListener('load', syncNavHeight);
 
 /* 有未结束的训练时，直接进训练页 */
 if (S.active) { currentTab = 'log'; go('log'); }
